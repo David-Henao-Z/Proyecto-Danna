@@ -132,6 +132,10 @@ def get_usuario_by_email(db: Session, email: str) -> Optional[UsuarioDB]:
     """Obtiene un usuario por email (retorna modelo SQLAlchemy)"""
     return db.query(UsuarioDB).filter(UsuarioDB.email == email).first()
 
+def obtener_usuario_por_email(db: Session, email: str) -> Optional[UsuarioDB]:
+    """Obtiene un usuario por email - alias para autenticación"""
+    return get_usuario_by_email(db, email)
+
 def create_usuario(db: Session, usuario: UsuarioCreate) -> Usuario:
     """Crea un nuevo usuario"""
     # Verificar que el email no exista
@@ -146,6 +150,29 @@ def create_usuario(db: Session, usuario: UsuarioCreate) -> Usuario:
         nombre=usuario.nombre,
         email=usuario.email,
         password=usuario.password,  # En producción, hashear la contraseña
+        rol_id=usuario.rol_id
+    )
+    
+    db.add(db_usuario)
+    db.commit()
+    db.refresh(db_usuario)
+    
+    return db_usuario_to_pydantic(db_usuario)
+
+def crear_usuario_con_hash(db: Session, usuario: UsuarioCreate, password_hash: str) -> Usuario:
+    """Crea un nuevo usuario con contraseña ya hasheada"""
+    # Verificar que el email no exista
+    if get_usuario_by_email(db, usuario.email):
+        raise ValueError("El email ya está registrado")
+    
+    # Verificar que el rol existe si se proporciona
+    if usuario.rol_id and not db.query(RolDB).filter(RolDB.id == usuario.rol_id).first():
+        raise KeyError("Rol no encontrado")
+    
+    db_usuario = UsuarioDB(
+        nombre=usuario.nombre,
+        email=usuario.email,
+        password=password_hash,  # Usar el hash proporcionado
         rol_id=usuario.rol_id
     )
     
